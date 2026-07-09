@@ -1,0 +1,13 @@
+[project]
+name = "sentinelai"
+version = "0.1.0"
+description = "Local-first Secure AI Operating Assistant"
+readme = "README.md"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+python_files = [
+    "test_*.py"
+]
