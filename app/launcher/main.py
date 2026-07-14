@@ -1,13 +1,11 @@
 from app.utils.logger import setup_logger
 from app.controller.assistant_controller import AssistantController
-from app.llm.client import LLMClient
 
 def main():
     logger = setup_logger()
-    llm = LLMClient()
-    controller = AssistantController(llm)
+    controller = AssistantController()
     
-    print("SentinalAI is starting....")
+    print("SentinelAI is starting....")
     print("Type 'exit' to quit the application.\n")
     
     while True:
