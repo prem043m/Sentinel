@@ -15,6 +15,32 @@ POLICY_RULES = {
         "confirmation": False,
     },
 
+    "open_url": {
+        "allowed": True,
+        "risk": RiskLevel.LOW,
+        "confirmation": False,
+    },
+
+    "search_web": {
+        "allowed": True,
+        "risk": RiskLevel.LOW,
+        "confirmation": False,
+    },
+
+    # Future browser capabilities — pre-registered with
+    # appropriate risk levels for when they are implemented.
+    "browser_download": {
+        "allowed": True,
+        "risk": RiskLevel.MEDIUM,
+        "confirmation": True,
+    },
+
+    "browser_automation": {
+        "allowed": False,
+        "risk": RiskLevel.HIGH,
+        "confirmation": True,
+    },
+
     "open_application": {
         "allowed": True,
         "risk": RiskLevel.LOW,
@@ -28,6 +54,12 @@ POLICY_RULES = {
     },
 
     "read_file": {
+        "allowed": True,
+        "risk": RiskLevel.MEDIUM,
+        "confirmation": False,
+    },
+
+    "list_directory": {
         "allowed": True,
         "risk": RiskLevel.MEDIUM,
         "confirmation": False,

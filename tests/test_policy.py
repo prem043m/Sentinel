@@ -34,6 +34,24 @@ def test_open_browser_allowed():
     assert not decision.confirmation_required
 
 
+def test_open_url_allowed():
+    engine = PolicyEngine()
+    plan = Plan(intent="open_url", tool="browser", parameters={})
+    decision = engine.evaluate(plan)
+    assert decision.allowed
+    assert decision.risk == RiskLevel.LOW
+    assert not decision.confirmation_required
+
+
+def test_search_web_allowed():
+    engine = PolicyEngine()
+    plan = Plan(intent="search_web", tool="browser", parameters={})
+    decision = engine.evaluate(plan)
+    assert decision.allowed
+    assert decision.risk == RiskLevel.LOW
+    assert not decision.confirmation_required
+
+
 def test_create_folder_allowed():
     engine = PolicyEngine()
 
@@ -45,6 +63,14 @@ def test_create_folder_allowed():
 
     decision = engine.evaluate(plan)
 
+    assert decision.allowed
+    assert decision.risk == RiskLevel.MEDIUM
+    assert not decision.confirmation_required
+
+def test_list_directory_allowed():
+    engine = PolicyEngine()
+    plan = Plan(intent="list_directory", tool="filesystem", parameters={})
+    decision = engine.evaluate(plan)
     assert decision.allowed
     assert decision.risk == RiskLevel.MEDIUM
     assert not decision.confirmation_required

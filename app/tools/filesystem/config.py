@@ -98,7 +98,19 @@ def create_default_roots() -> list[AllowedRoot]:
             deletable=False,
         ),
         AllowedRoot(
+            path=home / "OneDrive" / "Documents",
+            readable=True,
+            writable=True,
+            deletable=False,
+        ),
+        AllowedRoot(
             path=home / "Desktop",
+            readable=True,
+            writable=True,
+            deletable=False,
+        ),
+        AllowedRoot(
+            path=home / "OneDrive" / "Desktop",
             readable=True,
             writable=True,
             deletable=False,
@@ -107,6 +119,12 @@ def create_default_roots() -> list[AllowedRoot]:
             path=home / "Downloads",
             readable=True,
             writable=False,
+            deletable=False,
+        ),
+        AllowedRoot(
+            path=Path("D:/"),
+            readable=True,
+            writable=True,
             deletable=False,
         ),
     ]

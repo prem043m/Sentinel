@@ -12,6 +12,45 @@ class RulePlanner(PlannerStrategy):
             if self._matches(command["patterns"], user_input):
                 return deepcopy(command["plan"])
 
+        # ── Browser: open URL ─────────────────────────────────────
+        url_match = re.search(
+            r"(?:open|go\s+to|browse|visit|navigate\s+to)\s+"
+            r"((?:https?://)\S+)",
+            user_input,
+            re.IGNORECASE,
+        )
+
+        if not url_match:
+            # Match bare domains like "open google.com"
+            url_match = re.search(
+                r"(?:open|go\s+to|browse|visit|navigate\s+to)\s+"
+                r"(\S+\.\S+)",
+                user_input,
+                re.IGNORECASE,
+            )
+
+        if url_match:
+            return Plan(
+                intent="open_url",
+                tool="browser",
+                parameters={"url": url_match.group(1)},
+            )
+
+        # ── Browser: search web ───────────────────────────────────
+        search_match = re.search(
+            r"(?:search(?:\s+for)?|google)\s+(.+)",
+            user_input,
+            re.IGNORECASE,
+        )
+
+        if search_match:
+            return Plan(
+                intent="search_web",
+                tool="browser",
+                parameters={"query": search_match.group(1)},
+            )
+
+        # ── Filesystem: read file ─────────────────────────────────
         file_match = re.search(
             r"read(?:\s+file)?\s+(.+)",
             user_input,
@@ -23,6 +62,20 @@ class RulePlanner(PlannerStrategy):
                 intent="read_file",
                 tool="filesystem",
                 parameters={"path": file_match.group(1)},
+            )
+
+        # ── Filesystem: list directory ────────────────────────────
+        list_match = re.search(
+            r"list(?:\s+(?:directory|files\s+in))?\s+(.+)",
+            user_input,
+            re.IGNORECASE,
+        )
+
+        if list_match:
+            return Plan(
+                intent="list_directory",
+                tool="filesystem",
+                parameters={"path": list_match.group(1)},
             )
 
         return Plan(

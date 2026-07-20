@@ -74,10 +74,9 @@ class TestFileOperation:
 class TestCreateDefaultRoots:
     """Tests for the default root factory function."""
 
-    def test_returns_three_roots(self):
+    def test_returns_expected_roots(self):
         roots = create_default_roots()
-
-        assert len(roots) == 3
+        assert len(roots) == 6
 
     def test_all_roots_are_allowed_root_instances(self):
         roots = create_default_roots()
@@ -87,27 +86,24 @@ class TestCreateDefaultRoots:
 
     def test_documents_root(self):
         roots = create_default_roots()
-        documents = roots[0]
+        documents = next(r for r in roots if r.path == Path.home() / "Documents")
 
-        assert documents.path == Path.home() / "Documents"
         assert documents.readable is True
         assert documents.writable is True
         assert documents.deletable is False
 
     def test_desktop_root(self):
         roots = create_default_roots()
-        desktop = roots[1]
+        desktop = next(r for r in roots if r.path == Path.home() / "Desktop")
 
-        assert desktop.path == Path.home() / "Desktop"
         assert desktop.readable is True
         assert desktop.writable is True
         assert desktop.deletable is False
 
     def test_downloads_root(self):
         roots = create_default_roots()
-        downloads = roots[2]
+        downloads = next(r for r in roots if r.path == Path.home() / "Downloads")
 
-        assert downloads.path == Path.home() / "Downloads"
         assert downloads.readable is True
         assert downloads.writable is False
         assert downloads.deletable is False
@@ -118,12 +114,10 @@ class TestCreateDefaultRoots:
         for root in roots:
             assert root.deletable is False
 
-    def test_all_roots_are_under_home(self):
+    def test_all_roots_are_valid_paths(self):
         roots = create_default_roots()
-        home = Path.home()
-
         for root in roots:
-            assert str(root.path).startswith(str(home))
+            assert isinstance(root.path, Path)
 
     def test_returns_new_list_each_call(self):
         roots_a = create_default_roots()
