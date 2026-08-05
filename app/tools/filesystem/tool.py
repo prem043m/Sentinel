@@ -167,6 +167,9 @@ class FilesystemTool(Tool):
             logger.warning("Read rejected (too large): '%s' is %d bytes (limit: %d bytes).", canonical, size, MAX_READ_SIZE_BYTES)
             return ExecutionResult(success=False, message=f"Cannot read '{original_path}': file size ({size:,} bytes) exceeds the {limit_mb:.0f} MB limit.")
 
+        if canonical.is_dir():
+            return self._list_directory(canonical, plan.parameters, original_path)
+
         # ── 3. Read UTF-8 content ─────────────────────────────────
         try:
             content = canonical.read_text(encoding="utf-8")

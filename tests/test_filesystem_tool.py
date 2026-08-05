@@ -128,6 +128,21 @@ class TestValidTextFile:
         assert result.data["mime_type"] == "text/plain; charset=utf-8"
 
 
+class TestDirectoryFallback:
+    """Tests for directory paths passed to the file reader."""
+
+    def test_directory_path_lists_contents_instead_of_failing(
+        self, sandbox: Path, tool: FilesystemTool,
+    ):
+        plan = _read_plan(str(sandbox / "docs"))
+
+        result = tool.execute(plan)
+
+        assert result.success is True
+        assert "directory_contents" in result.data
+        assert len(result.data["directory_contents"]) == 4
+
+
 # ── Empty file ────────────────────────────────────────────────────
 
 
