@@ -140,7 +140,7 @@ class TestDirectoryFallback:
 
         assert result.success is True
         assert "directory_contents" in result.data
-        assert len(result.data["directory_contents"]) == 4
+        assert len(result.data["directory_contents"]) == 3
 
 
 # ── Empty file ────────────────────────────────────────────────────

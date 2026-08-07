@@ -1,72 +1,31 @@
-"""Application allowlist for the ApplicationTool.
+"""Backward-compatible application allowlist facade.
 
-This module defines the trust boundary between Planner output and
-Windows process execution.  Only applications explicitly listed here
-may be launched by the ApplicationTool.
-
-The allowlist uses a Python module (not JSON/YAML) for:
-- Type safety
-- Version control friendliness
-- No parser dependencies
-- Easy unit testing
+The production path now uses the application registry. This module
+exists only so older imports and tests can continue to resolve the
+legacy ``AllowedApplication`` shape.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
+
+from app.tools.application.database import ApplicationDatabase, bootstrap_applications
+from app.tools.application.registry import ApplicationRegistry
 
 
 @dataclass(frozen=True, slots=True)
 class AllowedApplication:
-    """An application that SentinelAI is permitted to launch.
-
-    Attributes:
-        name: The canonical display name (e.g. ``"Calculator"``).
-        executable: The Windows executable name or command
-                    (e.g. ``"calc.exe"``).  Must be resolvable on
-                    the system PATH or be an absolute path.
-    """
-
     name: str
     executable: str
 
 
-# ── Allowlist ──────────────────────────────────────────────────────
-# Every entry maps a *normalised lowercase* display name to its
-# AllowedApplication definition.  Lookup is always case-insensitive;
-# callers must normalise their query with ``str.lower()`` before
-# hitting this dict.
-
-_ALLOWLIST: dict[str, AllowedApplication] = {
-    "calculator": AllowedApplication(
-        name="Calculator",
-        executable="calc.exe",
-    ),
-    "notepad": AllowedApplication(
-        name="Notepad",
-        executable="notepad.exe",
-    ),
-    "google chrome": AllowedApplication(
-        name="Google Chrome",
-        executable="chrome.exe",
-    ),
-    "visual studio code": AllowedApplication(
-        name="Visual Studio Code",
-        executable="code.cmd",
-    ),
-}
+_COMPAT_REGISTRY = ApplicationRegistry(
+    database=ApplicationDatabase(seed=bootstrap_applications()),
+)
 
 
 def lookup(name: str) -> AllowedApplication | None:
-    """Look up an application by its friendly name.
-
-    The lookup is **case-insensitive**.  Leading and trailing
-    whitespace is stripped before matching.
-
-    Args:
-        name: The user-facing application name
-              (e.g. ``"Calculator"``, ``"calculator"``, ``"CALCULATOR"``).
-
-    Returns:
-        The matching ``AllowedApplication`` if the name is in the
-        allowlist, or ``None`` if it is not permitted.
-    """
-    return _ALLOWLIST.get(name.strip().lower())
+    application = _COMPAT_REGISTRY.lookup(name)
+    if application is None:
+        return None
+    return AllowedApplication(name=application.name, executable=application.path)

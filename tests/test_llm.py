@@ -15,7 +15,7 @@ def test_llm_client_implements_llm_service():
 def test_generate_returns_string_on_success():
     """Mocked Ollama returns a valid response."""
     mock_response = MagicMock()
-    mock_response.json.return_value = {"response": "Hello!"}
+    mock_response.content = b'{"response": "Hello!"}'
     mock_response.raise_for_status = MagicMock()
 
     with patch("app.llm.client.requests.post", return_value=mock_response):

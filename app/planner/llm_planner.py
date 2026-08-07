@@ -13,15 +13,16 @@ It does NOT:
 If any step fails, the exception propagates to the orchestrator.
 """
 
-import logging
-
+import hashlib
+from app.core.logger import RequestLogger
+from app.core.timing import timer_scope, record_metadata
 from app.llm.service import LLMService
 from app.models.plan import Plan
 from app.planner.prompt_builder import PromptBuilder
 from app.planner.response_parser import PlanResponseParser
 from app.planner.strategy import PlannerStrategy
 
-logger = logging.getLogger("SentinelAI.LLMPlanner")
+logger = RequestLogger("SentinelAI.LLMPlanner")
 
 
 class LLMPlanner(PlannerStrategy):
@@ -65,18 +66,40 @@ class LLMPlanner(PlannerStrategy):
         """
         logger.debug("LLMPlanner building prompt for: '%s'.", user_input)
 
-        prompt = self._prompt_builder.build(user_input)
+        with timer_scope("PromptBuilder"):
+            prompt = self._prompt_builder.build(user_input)
 
-        logger.debug("LLMPlanner sending prompt to LLM (%d chars).", len(prompt))
+        # Record prompt metrics
+        char_count = len(prompt)
+        est_tokens = char_count // 4
+        prompt_hash = hashlib.sha256(prompt.encode("utf-8")).hexdigest()[:12]
+        
+        record_metadata("prompt_chars", char_count)
+        record_metadata("prompt_tokens", est_tokens)
+        record_metadata("prompt_artifacts", 0)
+        record_metadata("prompt_history", 0)
+        record_metadata("artifacts_used", "None")
+        record_metadata("conversation_chars", 0)
+        record_metadata("artifact_chars", 0)
+        record_metadata("system_chars", char_count - len(user_input))
+        record_metadata("prompt_hash", prompt_hash)
 
-        raw_response = self._llm.generate(prompt)
-
-        logger.debug(
-            "LLMPlanner received response (%d chars).",
-            len(raw_response),
+        logger.info(
+            "Planner Prompt Metrics: characters=%d, est_tokens=%d, hash=%s",
+            char_count,
+            est_tokens,
+            prompt_hash,
         )
 
-        plan = self._response_parser.parse(raw_response)
+        logger.info("Sending planning prompt to LLM...")
+        with timer_scope("LLMRequest"):
+            raw_response = self._llm.generate(prompt)
+
+        record_metadata("response_length", len(raw_response))
+
+        logger.info("Parsing LLM planner response...")
+        with timer_scope("LLM_Parsing"):
+            plan = self._response_parser.parse(raw_response)
 
         logger.info(
             "LLMPlanner produced plan: intent='%s', tool='%s'.",

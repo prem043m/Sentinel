@@ -3,22 +3,18 @@
 This module is the **only** place where LLM prompts are assembled.
 No other component in SentinelAI builds prompt strings.
 
-The prompt is constructed from discrete, named sections so that
-individual sections can be modified, replaced, or dynamically
-generated without affecting the overall structure or any other
-component.
-
-Sections are defined as module-level constants for readability.
-The ``DefaultPromptBuilder`` assembles them into a final prompt
-string with the user's request appended as the last section.
-
-Future enhancements (not yet implemented):
-- ``ContextualPromptBuilder`` that injects conversation history.
-- Dynamic tool/intent sections from a CapabilityRegistry.
+The prompt is constructed dynamically from registered capabilities via
+a CapabilityRegistry and PromptFormatter.
 """
+
+from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+
+from app.planner.capabilities.formatter import MarkdownPromptFormatter, PromptFormatter
+from app.planner.capabilities.loader import CapabilityLoader
+from app.planner.capabilities.registry import CapabilityRegistry
 
 
 # ── Prompt Sections ───────────────────────────────────────────────
@@ -59,24 +55,8 @@ class PromptBuilder(ABC):
 
 
 # ══════════════════════════════════════════════════════════════════
-# Section Definitions — Production-Quality Prompt
+# Section Definitions — Static Core Sections
 # ══════════════════════════════════════════════════════════════════
-#
-# Each section is an independent, self-contained component.
-# Sections are ordered to give the LLM maximum context before
-# it encounters the user's request.
-#
-# Section order:
-#   1. System Role
-#   2. SentinelAI Architecture
-#   3. Available Tools
-#   4. Available Intents
-#   5. Parameter Rules
-#   6. Security Rules
-#   7. Output JSON Schema
-#   8. Positive Examples
-#   9. Negative Examples
-# (10. User Request — appended dynamically by build())
 
 _SECTION_SYSTEM_ROLE = PromptSection(
     name="SYSTEM ROLE",
@@ -107,65 +87,11 @@ _SECTION_ARCHITECTURE = PromptSection(
     ),
 )
 
-_SECTION_AVAILABLE_TOOLS = PromptSection(
-    name="AVAILABLE TOOLS",
-    content=(
-        "The following tools are registered in SentinelAI. You MUST "
-        "use exactly one of these tool names in your output.\n"
-        "\n"
-        "| Tool Name     | Description                              |\n"
-        "|---------------|------------------------------------------|\n"
-        "| application   | Launches desktop applications            |\n"
-        "| filesystem    | Reads files and lists directories         |\n"
-        "| browser       | Opens URLs and performs web searches      |\n"
-        "| llm           | Handles general chat and conversation     |"
-    ),
-)
-
-_SECTION_AVAILABLE_INTENTS = PromptSection(
-    name="AVAILABLE INTENTS",
-    content=(
-        "The following intents are supported. Each intent is bound "
-        "to exactly one tool. You MUST use one of these intent names.\n"
-        "\n"
-        "| Intent            | Tool        | Required Parameters         |\n"
-        "|-------------------|-------------|-----------------------------|\n"
-        "| open_application  | application | name (str)                  |\n"
-        "| read_file         | filesystem  | path (str)                  |\n"
-        "| list_directory    | filesystem  | path (str)                  |\n"
-        "| open_url          | browser     | url (str)                   |\n"
-        "| search_web        | browser     | query (str)                 |\n"
-        "| chat              | llm         | prompt (str)                |"
-    ),
-)
-
-_SECTION_PARAMETER_RULES = PromptSection(
-    name="PARAMETER RULES",
-    content=(
-        "1. Every intent requires specific parameters as listed above.\n"
-        "2. Parameter values must be strings.\n"
-        "3. For 'open_application': use the application's display "
-        "name (e.g. 'Calculator', 'Notepad', 'Google Chrome', "
-        "'Visual Studio Code').\n"
-        "4. For 'read_file': use the exact file path or filename "
-        "as provided by the user.\n"
-        "5. For 'list_directory': use the exact directory path "
-        "as provided by the user.\n"
-        "6. For 'open_url': include the full URL. If no scheme is "
-        "provided, assume 'https://'.\n"
-        "7. For 'search_web': use the user's search query as-is. "
-        "Do not modify or rephrase it.\n"
-        "8. For 'chat': place the user's entire message in the "
-        "'prompt' parameter."
-    ),
-)
-
 _SECTION_SECURITY_RULES = PromptSection(
     name="SECURITY RULES",
     content=(
         "1. NEVER invent tool names. Use ONLY the tools listed above.\n"
-        "2. NEVER invent intent names. Use ONLY the intents listed "
-        "above.\n"
+        "2. NEVER invent intent names. Use ONLY the intents listed above.\n"
         "3. NEVER output explanations, commentary, or markdown.\n"
         "4. NEVER wrap your output in code fences.\n"
         "5. NEVER output multiple JSON objects.\n"
@@ -191,39 +117,6 @@ _SECTION_OUTPUT_SCHEMA = PromptSection(
         "\n"
         "Do not add any fields beyond 'intent', 'tool', and "
         "'parameters'. Do not nest objects inside 'parameters'."
-    ),
-)
-
-_SECTION_POSITIVE_EXAMPLES = PromptSection(
-    name="POSITIVE EXAMPLES",
-    content=(
-        'User: "Open the calculator"\n'
-        '{"intent":"open_application","tool":"application",'
-        '"parameters":{"name":"Calculator"}}\n'
-        "\n"
-        'User: "Read the README file"\n'
-        '{"intent":"read_file","tool":"filesystem",'
-        '"parameters":{"path":"README.md"}}\n'
-        "\n"
-        'User: "List files in the docs folder"\n'
-        '{"intent":"list_directory","tool":"filesystem",'
-        '"parameters":{"path":"docs"}}\n'
-        "\n"
-        'User: "Open github.com"\n'
-        '{"intent":"open_url","tool":"browser",'
-        '"parameters":{"url":"https://github.com"}}\n'
-        "\n"
-        'User: "Search for Python tutorials"\n'
-        '{"intent":"search_web","tool":"browser",'
-        '"parameters":{"query":"Python tutorials"}}\n'
-        "\n"
-        'User: "What is the capital of France?"\n'
-        '{"intent":"chat","tool":"llm",'
-        '"parameters":{"prompt":"What is the capital of France?"}}\n'
-        "\n"
-        'User: "Hello, how are you?"\n'
-        '{"intent":"chat","tool":"llm",'
-        '"parameters":{"prompt":"Hello, how are you?"}}'
     ),
 )
 
@@ -261,58 +154,67 @@ _SECTION_NEGATIVE_EXAMPLES = PromptSection(
 )
 
 
-# ── Ordered section list ──────────────────────────────────────────
-
-DEFAULT_SECTIONS: list[PromptSection] = [
-    _SECTION_SYSTEM_ROLE,
-    _SECTION_ARCHITECTURE,
-    _SECTION_AVAILABLE_TOOLS,
-    _SECTION_AVAILABLE_INTENTS,
-    _SECTION_PARAMETER_RULES,
-    _SECTION_SECURITY_RULES,
-    _SECTION_OUTPUT_SCHEMA,
-    _SECTION_POSITIVE_EXAMPLES,
-    _SECTION_NEGATIVE_EXAMPLES,
-]
-"""The default ordered list of prompt sections.
-
-Exported for testing and introspection.  The list is not mutated
-at runtime; ``DefaultPromptBuilder`` makes a copy on construction.
-"""
-
-# Required section names — used for validation and testing.
-REQUIRED_SECTION_NAMES: frozenset[str] = frozenset(
-    section.name for section in DEFAULT_SECTIONS
-)
+REQUIRED_SECTION_NAMES: frozenset[str] = frozenset({
+    "SYSTEM ROLE",
+    "SENTINELAI ARCHITECTURE",
+    "AVAILABLE TOOLS",
+    "AVAILABLE INTENTS",
+    "PARAMETER RULES",
+    "SECURITY RULES",
+    "OUTPUT JSON SCHEMA",
+    "POSITIVE EXAMPLES",
+    "NEGATIVE EXAMPLES",
+})
 
 
 # ── Default Implementation ────────────────────────────────────────
 
-PROMPT_BUILDER_VERSION = "default-v1"
+PROMPT_BUILDER_VERSION = "dynamic-v2"
+
 
 class DefaultPromptBuilder(PromptBuilder):
-    """Builds a structured prompt from predefined sections.
-
-    The prompt is composed of named sections joined by headers.
-    Sections can be overridden via constructor injection for
-    testing or customisation.
-
-    Args:
-        sections: Optional list of ``PromptSection`` instances.
-                  If ``None``, the default production sections
-                  are used.
-    """
+    """Builds structured prompts dynamically from CapabilityRegistry."""
 
     def __init__(
         self,
         sections: list[PromptSection] | None = None,
+        registry: CapabilityRegistry | None = None,
+        formatter: PromptFormatter | None = None,
     ) -> None:
-        self._sections = list(sections) if sections else list(DEFAULT_SECTIONS)
+        self._registry = registry or CapabilityLoader().discover_and_load()
+        self._formatter = formatter or MarkdownPromptFormatter()
+
+        if sections is not None:
+            self._sections = list(sections)
+        else:
+            self._sections = self._build_dynamic_sections()
+
+    @property
+    def registry(self) -> CapabilityRegistry:
+        return self._registry
 
     @property
     def sections(self) -> list[PromptSection]:
         """Return the current prompt sections (read-only copy)."""
         return list(self._sections)
+
+    def _build_dynamic_sections(self) -> list[PromptSection]:
+        tools_content = self._formatter.format_tools(self._registry)
+        intents_content = self._formatter.format_intents(self._registry)
+        params_content = self._formatter.format_parameter_rules(self._registry)
+        examples_content = self._formatter.format_positive_examples(self._registry)
+
+        return [
+            _SECTION_SYSTEM_ROLE,
+            _SECTION_ARCHITECTURE,
+            PromptSection(name="AVAILABLE TOOLS", content=tools_content),
+            PromptSection(name="AVAILABLE INTENTS", content=intents_content),
+            PromptSection(name="PARAMETER RULES", content=params_content),
+            _SECTION_SECURITY_RULES,
+            _SECTION_OUTPUT_SCHEMA,
+            PromptSection(name="POSITIVE EXAMPLES", content=examples_content),
+            _SECTION_NEGATIVE_EXAMPLES,
+        ]
 
     def build(self, user_input: str) -> str:
         """Construct the full prompt string.
@@ -337,3 +239,7 @@ class DefaultPromptBuilder(PromptBuilder):
         parts.append(user_input)
 
         return "\n".join(parts)
+
+
+DEFAULT_SECTIONS: list[PromptSection] = DefaultPromptBuilder().sections
+

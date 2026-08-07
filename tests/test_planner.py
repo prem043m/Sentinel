@@ -18,6 +18,26 @@ def test_open_calculator_plan():
     assert plan.tool == "application"
 
 
+def test_open_calculator_plan_handles_typo():
+    planner = RulePlanner()
+
+    plan = planner.create_plan("opne calculator")
+
+    assert plan.intent == "open_application"
+    assert plan.tool == "application"
+    assert plan.parameters["name"] == "Calculator"
+
+
+def test_open_vs_code_plan():
+    planner = RulePlanner()
+
+    plan = planner.create_plan("open vs code")
+
+    assert plan.intent == "open_application"
+    assert plan.tool == "application"
+    assert plan.parameters["name"] == "Visual Studio Code"
+
+
 def test_read_file_plan():
 
     planner = RulePlanner()
@@ -42,6 +62,16 @@ def test_open_url_plan():
     assert plan.intent == "open_url"
     assert plan.tool == "browser"
     assert plan.parameters["url"] == "https://github.com"
+
+
+def test_open_github_profile_path_plan():
+    planner = RulePlanner()
+
+    plan = planner.create_plan("open github/prem043m")
+
+    assert plan.intent == "open_url"
+    assert plan.tool == "browser"
+    assert plan.parameters["url"] == "https://github.com/prem043m"
 
 def test_open_bare_domain_plan():
     planner = RulePlanner()

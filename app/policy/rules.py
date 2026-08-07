@@ -89,4 +89,9 @@ POLICY_RULES = {
         "confirmation": True,
     },
 
+    "unsupported_operation": {
+        "allowed": False,
+        "risk": RiskLevel.HIGH,
+        "confirmation": False,
+    },
 }

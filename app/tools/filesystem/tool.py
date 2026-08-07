@@ -167,12 +167,11 @@ class FilesystemTool(Tool):
             logger.warning("Read rejected (too large): '%s' is %d bytes (limit: %d bytes).", canonical, size, MAX_READ_SIZE_BYTES)
             return ExecutionResult(success=False, message=f"Cannot read '{original_path}': file size ({size:,} bytes) exceeds the {limit_mb:.0f} MB limit.")
 
-        if canonical.is_dir():
-            return self._list_directory(canonical, plan.parameters, original_path)
-
         # ── 3. Read UTF-8 content ─────────────────────────────────
         try:
             content = canonical.read_text(encoding="utf-8")
+        except IsADirectoryError:
+            return self._list_directory(canonical, {}, original_path)
         except UnicodeDecodeError:
             logger.warning("Read rejected (binary): '%s' is not valid UTF-8.", canonical)
             return ExecutionResult(success=False, message=f"Cannot read '{original_path}': file appears to be binary, not UTF-8 text.")
@@ -180,6 +179,21 @@ class FilesystemTool(Tool):
             logger.warning("Read failed (not found after stat): '%s'.", canonical)
             return ExecutionResult(success=False, message=f"File not found: '{original_path}'.")
         except PermissionError:
+            try:
+                iterator = canonical.iterdir()
+                try:
+                    next(iterator)
+                except StopIteration:
+                    pass
+            except NotADirectoryError:
+                logger.error("Read failed (permission denied): '%s'.", canonical)
+                return ExecutionResult(success=False, message=f"Permission denied: cannot read '{original_path}'.")
+            except PermissionError:
+                logger.error("Read failed (permission denied): '%s'.", canonical)
+                return ExecutionResult(success=False, message=f"Permission denied: cannot read '{original_path}'.")
+            else:
+                return self._list_directory(canonical, {}, original_path)
+
             logger.error("Read failed (permission denied): '%s'.", canonical)
             return ExecutionResult(success=False, message=f"Permission denied: cannot read '{original_path}'.")
         except OSError as exc:

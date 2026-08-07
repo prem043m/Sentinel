@@ -65,6 +65,7 @@ app/
   tools/          Application, browser, and filesystem tools
   llm/            Ollama client abstraction
   evaluation/     Planner comparison and JSONL observation utilities
+  context/        Session-only conversation and tool-result context
   models/         Plan, policy, and result data models
 tests/            pytest suite
 docs/             Design notes and roadmap
@@ -105,13 +106,21 @@ Type `exit` to leave the CLI.
 .\.Senv\Scripts\python.exe -m pytest tests -q
 ```
 
-The checkout currently has 219 passing tests, 21 failing tests, and 76 setup
+The checkout currently has 235 passing tests, 21 failing tests, and 76 setup
 errors when run in the supplied environment. The first failure is a mismatch
 between browser tests (which expect `webbrowser` integration) and the current
 simulated `BrowserTool`. Many filesystem test setup errors are caused by
 permission-denied temporary-directory creation in the environment. These
 results mean the suite is not currently green; they are not a release-quality
 test result.
+
+## Session context
+
+Phase 8 adds a session-only Context Engine. It records bounded, policy-filtered
+user messages, assistant replies, and successful tool summaries so a follow-up
+chat request can refer to work performed earlier in the same process. It does
+not persist data or learn automatically. See [Context Engine](docs/context_engine.md)
+for architecture, safety controls, and extension points.
 
 ## Work in progress and limitations
 

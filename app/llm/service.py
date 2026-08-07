@@ -17,6 +17,7 @@ Future providers (not yet implemented):
 """
 
 from abc import ABC, abstractmethod
+from typing import Any
 
 
 class LLMService(ABC):
@@ -43,3 +44,11 @@ class LLMService(ABC):
             Any exception if the LLM call fails.
         """
         raise NotImplementedError
+
+    def warm_up(self) -> dict[str, Any]:
+        """Verify LLM status and warm/load the model.
+
+        Returns:
+            A dictionary containing status metadata.
+        """
+        return {}

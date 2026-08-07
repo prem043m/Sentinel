@@ -33,7 +33,38 @@ COMMANDS = [
     },
     {
         "patterns" : [
+           r"\b(open|launch|start)\b.*\b(edge|microsoft edge)\b"
+        ],
+        "plan": Plan(
+            intent="open_application",
+            tool="application",
+            parameters={"name": "Microsoft Edge"}
+        )
+    },
+    {
+        "patterns" : [
+           r"\b(open|launch|start)\b.*\b(file explorer|explorer|files)\b"
+        ],
+        "plan": Plan(
+            intent="open_application",
+            tool="application",
+            parameters={"name": "File Explorer"}
+        )
+    },
+    {
+        "patterns" : [
             r"\b(open|launch|start)\b.*\bvisual studio code\b"
+        ],
+        "plan": Plan(
+            intent="open_application",
+            tool="application",
+            parameters={"name": "Visual Studio Code"}
+        )
+    }
+    ,
+    {
+        "patterns" : [
+           r"\b(open|launch|start)\b.*\b(vs code|vscode)\b"
         ],
         "plan": Plan(
             intent="open_application",

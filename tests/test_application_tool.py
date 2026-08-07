@@ -14,6 +14,9 @@ import subprocess
 from unittest.mock import MagicMock, patch
 
 from app.models.plan import Plan
+from app.tools.application.database import ApplicationDatabase
+from app.tools.application.models import Application, ApplicationSource, build_application_id
+from app.tools.application.registry import ApplicationRegistry
 from app.tools.application.tool import ApplicationTool
 
 
@@ -24,6 +27,11 @@ def _make_plan(name: str) -> Plan:
         tool="application",
         parameters={"name": name},
     )
+
+
+def _custom_registry(application: Application | None = None) -> ApplicationRegistry:
+    seed = (application,) if application is not None else ()
+    return ApplicationRegistry(database=ApplicationDatabase(file_path=None, seed=seed))
 
 
 class TestAllowedApplicationLaunch:
@@ -156,6 +164,22 @@ class TestBlockedApplications:
         assert not result.success
         mock_popen.assert_not_called()
 
+    @patch("app.tools.application.tool.subprocess.Popen")
+    def test_unapproved_application_is_refused(self, mock_popen: MagicMock):
+        application = Application(
+            id=build_application_id("Steam", r"C:\\Steam\\steam.exe", ApplicationSource.REGISTRY),
+            name="Steam",
+            path=r"C:\\Steam\\steam.exe",
+            aliases=("steam",),
+            approved=False,
+            source=ApplicationSource.REGISTRY,
+        )
+        tool = ApplicationTool(registry=_custom_registry(application))
+        result = tool.execute(_make_plan("Steam"))
+
+        assert not result.success
+        mock_popen.assert_not_called()
+
 
 class TestSubprocessErrors:
     """Tests for subprocess failure scenarios."""
@@ -170,6 +194,20 @@ class TestSubprocessErrors:
         assert not result.success
         assert "not found" in result.message
         assert result.data is None
+
+    @patch("app.tools.application.tool.subprocess.Popen")
+    def test_fallback_executable_is_tried_after_missing_primary(self, mock_popen: MagicMock):
+        mock_process = MagicMock()
+        mock_process.pid = 2468
+        mock_popen.side_effect = [FileNotFoundError("missing"), mock_process]
+
+        tool = ApplicationTool()
+        result = tool.execute(_make_plan("Microsoft Edge"))
+
+        assert result.success
+        assert result.data == {"pid": 2468}
+        assert mock_popen.call_args_list[0].args[0] == ["msedge.exe"]
+        assert mock_popen.call_args_list[1].args[0][0].endswith("msedge.exe")
 
     @patch("app.tools.application.tool.subprocess.Popen")
     def test_permission_error(self, mock_popen: MagicMock):
